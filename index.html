@@ -1,97 +1,89 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>m1nTa uAn9 dOnkzz</title>
-<style>
-body{
-    margin:0;
-    padding:0;
-    font-family:Comic Sans MS, cursive;
-    background:linear-gradient(135deg,#ff9ad5,#ffd6f6,#fff0a8);
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    height:100vh;
-    animation:bggerak 5s infinite alternate;
-}
-@keyframes bggerak{
-    from{filter:hue-rotate(0deg);}
-    to{filter:hue-rotate(60deg);}
-}
-.box{
-    background:white;
-    padding:30px;
-    border-radius:25px;
-    box-shadow:0 0 25px rgba(255,0,128,0.4);
-    text-align:center;
-    width:330px;
-    border:4px dashed pink;
-}
-h1{
-    color:#ff1493;
-    font-size:28px;
-    text-shadow:2px 2px yellow;
-}
-p{
-    font-size:18px;
-    color:#444;
-    line-height:1.6;
-}
-button{
-    background:linear-gradient(45deg,#ff1493,#ff69b4);
-    color:white;
-    border:none;
-    padding:14px 24px;
-    border-radius:15px;
-    font-size:18px;
-    cursor:pointer;
-    margin-top:15px;
-    font-weight:bold;
-    box-shadow:0 5px 10px rgba(0,0,0,0.2);
-}
-button:hover{
-    transform:scale(1.05);
-}
-.dana{
-    margin-top:18px;
-    padding:12px;
-    background:#fff0f8;
-    border-radius:15px;
-    font-weight:bold;
-    color:#ff1493;
-    font-size:18px;
-    border:2px dotted hotpink;
-}
-marquee{
-    color:red;
-    font-weight:bold;
-    margin-bottom:10px;
-}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Face Recognition Pameran</title>
+    <script defer src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+    <style>
+        body { margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; background-color: #0d1117; color: #00ffcc; font-family: 'Courier New', Courier, monospace; }
+        canvas { position: absolute; }
+        video { border: 2px solid #00ffcc; border-radius: 10px; box-shadow: 0 0 20px #00ffcc; }
+        .loading { margin-top: 20px; font-size: 1.2em; }
+        h2 { text-transform: uppercase; letter-spacing: 3px; }
+    </style>
 </head>
 <body>
 
-<div class="box">
-    <marquee>💔 aNakmu lAg1 bUtUh dAnA cEpEt 💔</marquee>
-
-    <h1>hAlO aYaH iBuHh 😭💸</h1>
-
-    <p>
-        kLo kAn9 smwngkinyA sYg sm aNakmu ini 😭<br>
-        t0L0n9 k1r1m uAn9 jAjAn dOnkzz 😔<br>
-        lApEr, hAuS, dAn hAt1 iNi juGa kOs0n9 😭💔
-    </p>
-
-    <button onclick="alert('mAkAs1h yAahh ayah ibuu 😘💸 sem0ga panjang umurrr')">
-        kIr1m sEkArAn9 💕💸
-    </button>
-
-    <div class="dana">
-        No DANA : 082261195070
+    <h2>AI Face Scanner v1.0</h2>
+    <div id="status" class="loading">Memuat Otak AI... (Tunggu sebentar)</div>
+    
+    <div style="position: relative" class="margin">
+        <video id="video" width="600" height="450" autoplay muted></video>
     </div>
-</div>
 
+    <script>
+        const video = document.getElementById('video');
+        const statusText = document.getElementById('status');
+
+        function startVideo() {
+            navigator.mediaDevices.getUserMedia({ video: {} })
+                .then(stream => { video.srcObject = stream; })
+                .catch(err => console.error("Kamera Error: ", err));
+        }
+
+        Promise.all([
+            faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/'),
+            faceapi.nets.faceLandmark68Net.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/'),
+            faceapi.nets.faceRecognitionNet.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/'),
+            faceapi.nets.ssdMobilenetv1.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/')
+        ]).then(setupRecognition);
+
+        async function setupRecognition() {
+            statusText.innerText = "Mendaftarkan Wajah...";
+            const labeledFaceDescriptors = await loadLabeledImages();
+            const faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, 0.6);
+            
+            statusText.innerText = "Sistem Aktif! Scan Wajah Anda";
+            startVideo();
+
+            video.addEventListener('play', () => {
+                const canvas = faceapi.createCanvasFromMedia(video);
+                document.body.append(canvas);
+                const displaySize = { width: video.width, height: video.height };
+                faceapi.matchDimensions(canvas, displaySize);
+
+                setInterval(async () => {
+                    const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
+                        .withFaceLandmarks()
+                        .withFaceDescriptors();
+                    
+                    const resizedDetections = faceapi.resizeResults(detections, displaySize);
+                    canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+
+                    const results = resizedDetections.map(d => faceMatcher.findBestMatch(d.descriptor));
+                    
+                    results.forEach((result, i) => {
+                        const box = resizedDetections[i].detection.box;
+                        const drawBox = new faceapi.draw.DrawBox(box, { label: result.toString() });
+                        drawBox.draw(canvas);
+                    });
+                }, 100);
+            });
+        }
+
+        async function loadLabeledImages() 
+            const labels = ['Budie']; 
+            return Promise.all(
+                labels.map(async label => {
+                    const descriptions = [];
+                    const img = await faceapi.fetchImage(`shafiq.jpg`); 
+                    const detections = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
+                    descriptions.push(detections.descriptor);
+                    return new faceapi.LabeledFaceDescriptors(label, descriptions);
+                })
+            );
+        }
+    </script>
 </body>
 </html>
